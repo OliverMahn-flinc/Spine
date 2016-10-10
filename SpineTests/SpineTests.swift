@@ -511,7 +511,34 @@ class SaveRelationshipsTests: SpineTests {
 		}
 	}
 
-    func testItShouldPATCHToOneRelationshipsIfDirty() {
+    func testItShouldPOSTNewToOneRelationshipsIfDirty() {
+        var relationshipUpdated = false
+        
+        HTTPClient.handler = { request, payload in
+            if(request.HTTPMethod! == "POST" && request.URL!.absoluteString == "http://example.com/foos/1/relationships/to-one-attribute") {
+                let json = JSON(data: payload!)
+                if json["data"]["type"].string == "bars" {
+                    relationshipUpdated = true
+                }
+            }
+            return (responseData: self.fixture.data, statusCode: 201, error: nil)
+        }
+        
+        //        let bar = Bar(id: "13")
+        let bar = Bar()
+        foo.toOneAttribute = bar
+        
+        let future = spine.save(foo)
+        let expectation = expectationWithDescription("")
+        assertFutureSuccess(future, expectation: expectation)
+        
+        waitForExpectationsWithTimeout(10) { error in
+            XCTAssertNil(error, "\(error)")
+            XCTAssertTrue(relationshipUpdated)
+        }
+    }
+    
+    func testItShouldPATCHExistingToOneRelationshipsIfDirty() {
         var relationshipUpdated = false
         
         HTTPClient.handler = { request, payload in

@@ -335,10 +335,21 @@ class SaveOperation: ConcurrentOperation {
 		for relationship in relationships {
 			switch relationship {
 			case let toOne as ToOneRelationship:
-				let operation = RelationshipReplaceOperation(resource: resource, relationship: toOne, spine: spine)
-				operation.completionBlock = { [unowned operation] in completionHandler(result: operation.result) }
-				relationshipOperationQueue.addOperation(operation)
-
+                if let relationshipResource = resource.valueForKey(relationship.name) as? Resource {
+                    if  relationshipResource.id == nil {
+                        let operation = RelationshipCreateOperation(resource: resource, relationship: toOne, spine: spine)
+                        operation.completionBlock = { [unowned operation] in completionHandler(result: operation.result) }
+                        relationshipOperationQueue.addOperation(operation)
+                    } else {
+                        let operation = RelationshipReplaceOperation(resource: resource, relationship: toOne, spine: spine)
+                        operation.completionBlock = { [unowned operation] in completionHandler(result: operation.result) }
+                        relationshipOperationQueue.addOperation(operation)
+                    }
+                } else {
+                    let operation = RelationshipReplaceOperation(resource: resource, relationship: toOne, spine: spine)
+                    operation.completionBlock = { [unowned operation] in completionHandler(result: operation.result) }
+                    relationshipOperationQueue.addOperation(operation)
+                }
 			case let toMany as ToManyRelationship:
 				let addOperation = RelationshipMutateOperation(resource: resource, relationship: toMany, mutation: .Add, spine: spine)
 				addOperation.completionBlock = { [unowned addOperation] in completionHandler(result: addOperation.result) }
@@ -394,7 +405,7 @@ private class RelationshipOperation: ConcurrentOperation {
 }
 
 /// A RelationshipReplaceOperation replaces the entire contents of a relationship.
-private class RelationshipReplaceOperation: RelationshipOperation {
+private class RelationshipCreateOperation: RelationshipOperation {
 	let resource: Resource
 	let relationship: Relationship
 
@@ -420,9 +431,41 @@ private class RelationshipReplaceOperation: RelationshipOperation {
 			return
 		}
 
-		Spine.logInfo(.Spine, "Replacing relationship \(relationship) using URL: \(URL)")
-		networkClient.request("PATCH", URL: URL, payload: payload, callback: handleNetworkResponse)
+		Spine.logInfo(.Spine, "Creating relationship \(relationship) using URL: \(URL)")
+		networkClient.request("POST", URL: URL, payload: payload, callback: handleNetworkResponse)
 	}
+}
+
+/// A RelationshipReplaceOperation replaces the entire contents of a relationship.
+private class RelationshipReplaceOperation: RelationshipOperation {
+    let resource: Resource
+    let relationship: Relationship
+    
+    init(resource: Resource, relationship: Relationship, spine: Spine) {
+        self.resource = resource
+        self.relationship = relationship
+        super.init()
+        self.spine = spine
+    }
+    
+    override func execute() {
+        let URL = router.URLForRelationship(relationship, ofResource: resource)
+        let payload: NSData
+        
+        switch relationship {
+        case is ToOneRelationship:
+            payload = try! serializer.serializeLinkData(resource.valueForField(relationship.name) as? Resource)
+        case is ToManyRelationship:
+            let relatedResources = (resource.valueForField(relationship.name) as? ResourceCollection)?.resources ?? []
+            payload = try! serializer.serializeLinkData(relatedResources)
+        default:
+            assertionFailure("Cannot only replace relationship contents for ToOneRelationship and ToManyRelationship")
+            return
+        }
+        
+        Spine.logInfo(.Spine, "Replacing relationship \(relationship) using URL: \(URL)")
+        networkClient.request("PATCH", URL: URL, payload: payload, callback: handleNetworkResponse)
+    }
 }
 
 /// A RelationshipMutateOperation mutates a to-many relationship by adding or removing linked resources.

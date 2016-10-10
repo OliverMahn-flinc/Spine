@@ -112,8 +112,12 @@ public class Serializer {
 		let payloadData: AnyObject
 		
 		if let resource = resource {
-			assert(resource.id != nil, "Attempt to convert resource without id to linkage. Only resources with ids can be converted to linkage.")
-			payloadData = ["type": resource.resourceType, "id": resource.id!]
+			//assert(resource.id != nil, "Attempt to convert resource without id to linkage. Only resources with ids can be converted to linkage.")
+            if resource.id != nil {
+                payloadData = ["type": resource.resourceType, "id": resource.id!]
+            } else {
+                payloadData = ["type": resource.resourceType]
+            }
 		} else {
 			payloadData = NSNull()
 		}
