@@ -422,7 +422,8 @@ private class RelationshipCreateOperation: RelationshipOperation {
 		
 		switch relationship {
 		case is ToOneRelationship:
-				payload = try! serializer.serializeLinkData(resource.valueForField(relationship.name) as? Resource)
+            let payLoadResource = resource.valueForField(relationship.name) as! Resource
+            payload = try! serializer.serializeResources([payLoadResource], options: [.IncludeToOne, .IncludeToMany])
 		case is ToManyRelationship:
 			let relatedResources = (resource.valueForField(relationship.name) as? ResourceCollection)?.resources ?? []
 			payload = try! serializer.serializeLinkData(relatedResources)
