@@ -426,7 +426,7 @@ private class RelationshipCreateOperation: RelationshipOperation {
             payload = try! serializer.serializeResources([payLoadResource], options: [.IncludeToOne, .IncludeToMany])
 		case is ToManyRelationship:
 			let relatedResources = (resource.valueForField(relationship.name) as? ResourceCollection)?.resources ?? []
-			payload = try! serializer.serializeLinkData(relatedResources)
+			payload = try! serializer.serializeResources(relatedResources)
 		default:
 			assertionFailure("Cannot only replace relationship contents for ToOneRelationship and ToManyRelationship")
 			return
@@ -434,6 +434,7 @@ private class RelationshipCreateOperation: RelationshipOperation {
 
 		Spine.logInfo(.Spine, "Creating relationship \(relationship) using URL: \(URL)")
 		networkClient.request("POST", URL: URL, payload: payload, callback: handleNetworkResponse)
+        resource.markField(relationship.name, asDirty: false)
 	}
 }
 
